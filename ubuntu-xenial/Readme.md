@@ -1,6 +1,6 @@
 COM 341, Operating Systems
 ==========================
-# Project #2: [Process Control Block](https://elixir.bootlin.com/linux/v6.8/source/include/linux/sched.h#L748
+# Project #2: [Process Control Block](https://elixir.bootlin.com/linux/v6.8/source/include/linux/sched.h#L748)
 
 ![Compiling a Linux Kernel](http://i.imgur.com/t0c7Wav.gif)
 

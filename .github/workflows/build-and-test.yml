@@ -1,0 +1,157 @@
+name: Build and Test
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    container: ghcr.io/auca-com-341-fall-2024/project-2-env:latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Test if the Correct '.gitignore' File is Present
+      run: |
+        # Check '.gitignore'
+        if [ ! -f '.gitignore' ]
+        then
+          echo -e "The '.gitignore' file is missing."
+          exit 1
+        fi
+        if ! grep --quiet 'deb' '.gitignore'
+        then
+          echo -e 'The '\''.gitignore'\'' file does not have the `deb` file type.'
+          exit 1
+        fi
+
+    - name: Test if the 'ubuntu-noble' Directory is Present and Has a Correct Structure
+      run: |
+        # Check 'ubuntu-noble' and its content
+        if [ ! -d 'ubuntu-noble' ]
+        then
+          echo -e "The 'ubuntu-noble' directory is missing."
+          exit 1
+        fi
+        if [ ! -d 'ubuntu-noble/task_info' ]
+        then
+          echo -e "The 'ubuntu-noble/task_info' directory is missing."
+          exit 1
+        fi
+
+    - name: Test if the C Files are Present
+      run: |
+        # Check 'ubuntu-noble/task_info/get_pids.c' and 'ubuntu-noble/task_info/get_task_info.c'
+        if [ ! -f 'ubuntu-noble/task_info/get_pids.c' ]
+        then
+          echo -e "The 'get_pids.c' file is missing in 'ubuntu-noble/task_info/'."
+          exit 1
+        fi
+        if [ ! -f 'ubuntu-noble/task_info/get_task_info.c' ]
+        then
+          echo -e "The 'get_task_info.c' file is missing in 'ubuntu-noble/task_info/'."
+          exit 1
+        fi
+
+    - name: Test if the C Files are Correct
+      run: |
+        # Check 'ubuntu-noble/task_info/get_pids.c' and 'ubuntu-noble/task_info/get_task_info.c'
+        if ! grep --quiet --fixed-strings 'linux/sched/stat.h' 'ubuntu-noble/task_info/get_pids.c'
+        then
+          echo "The 'get_pids.c' file does not have the correct includes."
+          exit 1
+        fi
+        if ! grep --quiet --fixed-strings 'linux/sched/cputime.h' 'ubuntu-noble/task_info/get_task_info.c'
+        then
+          echo "The 'get_task_info.c' file does not have the correct includes."
+          exit 1
+        fi
+        if ! grep --quiet --fixed-strings 'div_u64(' 'ubuntu-noble/task_info/get_task_info.c'
+        then
+          echo "The 'get_task_info.c' file does not have the correct function calls."
+          exit 1
+        fi
+        if ! grep --quiet --fixed-strings 'task_state_index(' 'ubuntu-noble/task_info/get_task_info.c'
+        then
+          echo "The 'get_task_info.c' file does not have the correct function calls."
+          exit 1
+        fi
+
+    - name: Test if the Kernel File is Present
+      run: |
+        # Check 'ubuntu-noble/vmlinuz-6.8.0-49-generic'
+        if [ ! -f 'ubuntu-noble/vmlinuz-6.8.0-49-generic' ]
+        then
+          echo -e "The 'vmlinuz-6.8.0-49-generic' file is missing in 'ubuntu-noble/'."
+          exit 1
+        fi
+
+    - name: Record the Kernel File Boot Process for Manual Checking
+      run: |
+        # Record 'ubuntu-noble/vmlinuz-6.8.0-49-generic' booting. It may take up to 2 minutes.
+        KERNEL="ubuntu-noble/vmlinuz-6.8.0-49-generic"
+        ARCH=$(file "$KERNEL" | grep -o 'x86' || true)
+        if [[ "$ARCH" == "x86" ]]; then
+            TARGET="qemu-system-amd64                                              \
+                      -machine type=pc,accel=tcg                                   \
+                      -m 1024M                                                     \
+                      -smp 1                                                       \
+                      -kernel $KERNEL                                              \
+                      -initrd /project-2/kernels/amd64/initrd.img-6.8.0-49-generic \
+                      -nographic                                                   \
+                      -serial mon:stdio                                            \
+                      -append console=ttyS0"
+        else
+            TARGET="qemu-system-aarch64                                            \
+                      -machine type=virt,accel=tcg                                 \
+                      -cpu cortex-a57                                              \
+                      -m 1024M                                                     \
+                      -smp 1                                                       \
+                      -kernel $KERNEL                                              \
+                      -initrd /project-2/kernels/arm64/initrd.img-6.8.0-49-generic \
+                      -nographic                                                   \
+                      -serial mon:stdio"
+        fi
+
+        script -qec "export TERM=xterm-256color; stty rows 48 cols 160 && expect -c '\
+          spawn stty rows 48 cols 160;                                               \
+          spawn asciinema rec -c \"$TARGET\" recording.cast;                         \
+          set timeout 50;                                                            \
+          expect eof                                                                 \
+        '" /dev/null > /dev/null 2>&1
+
+        if [ $? -ne 0 ]
+        then
+          echo -e "The emulator failed to boot the kernel successfully."
+          exit 1
+        fi
+        if [ ! -s 'recording.cast' ]
+        then
+          echo -e 'Failed to generate the recording of the boot process.'
+          exit 1
+        fi
+
+        agg --theme asciinema recording.cast recording.gif > /dev/null 2>&1
+        if [ ! -s 'recording.gif' ]
+        then
+          echo -e "Failed to generate the '.gif' version of the recording of the boot process."
+          exit 1
+        fi
+
+        ffmpeg -i recording.gif -c:v libx264 -preset superfast -loglevel error recording.mp4
+        if [ ! -s 'recording.mp4' ]
+        then
+          echo -e "Failed to generate the '.mp4' version of the recording of the boot process."
+          exit 1
+        fi
+
+    - name: Upload the Screen Recording
+      uses: actions/upload-artifact@v4
+      with:
+        name: recording
+        path: |
+          recording.mp4
+        if-no-files-found: error
