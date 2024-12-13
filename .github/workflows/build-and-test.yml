@@ -82,37 +82,38 @@ jobs:
 
     - name: Test if the Kernel File is Present
       run: |
-        # Check 'ubuntu-noble/vmlinuz-6.8.0-49-generic'
-        if [ ! -f 'ubuntu-noble/vmlinuz-6.8.0-49-generic' ]
+        # Check 'ubuntu-noble/vmlinuz-6.8.0-*-generic'
+        KERNEL=$(ls ubuntu-noble/vmlinuz-6.8.0-*-generic 2>/dev/null)
+        if [ ! -f "$KERNEL" ]
         then
-          echo -e "The 'vmlinuz-6.8.0-49-generic' file is missing in 'ubuntu-noble/'."
+          echo -e "The 'vmlinuz-6.8.0-*-generic' file is missing in 'ubuntu-noble/'."
           exit 1
         fi
 
     - name: Record the Kernel File Boot Process for Manual Checking
       run: |
-        # Record 'ubuntu-noble/vmlinuz-6.8.0-49-generic' booting. It may take up to 2 minutes.
-        KERNEL="ubuntu-noble/vmlinuz-6.8.0-49-generic"
+        # Record 'ubuntu-noble/vmlinuz-6.8.0-*-generic' booting. It may take up to 2 minutes.
+        KERNEL=$(ls ubuntu-noble/vmlinuz-6.8.0-*-generic 2>/dev/null)
         ARCH=$(file "$KERNEL" | grep -o 'x86' || true)
         if [[ "$ARCH" == "x86" ]]; then
-            TARGET="qemu-system-amd64                                              \
-                      -machine type=pc,accel=tcg                                   \
-                      -m 1024M                                                     \
-                      -smp 1                                                       \
-                      -kernel $KERNEL                                              \
-                      -initrd /project-2/kernels/amd64/initrd.img-6.8.0-49-generic \
-                      -nographic                                                   \
-                      -serial mon:stdio                                            \
+            TARGET="qemu-system-amd64                                             \
+                      -machine type=pc,accel=tcg                                  \
+                      -m 1024M                                                    \
+                      -smp 1                                                      \
+                      -kernel $KERNEL                                             \
+                      -initrd /project-2/kernels/amd64/initrd.img-6.8.0-*-generic \
+                      -nographic                                                  \
+                      -serial mon:stdio                                           \
                       -append console=ttyS0"
         else
-            TARGET="qemu-system-aarch64                                            \
-                      -machine type=virt,accel=tcg                                 \
-                      -cpu cortex-a57                                              \
-                      -m 1024M                                                     \
-                      -smp 1                                                       \
-                      -kernel $KERNEL                                              \
-                      -initrd /project-2/kernels/arm64/initrd.img-6.8.0-49-generic \
-                      -nographic                                                   \
+            TARGET="qemu-system-aarch64                                           \
+                      -machine type=virt,accel=tcg                                \
+                      -cpu cortex-a57                                             \
+                      -m 1024M                                                    \
+                      -smp 1                                                      \
+                      -kernel $KERNEL                                             \
+                      -initrd /project-2/kernels/arm64/initrd.img-6.8.0-*-generic \
+                      -nographic                                                  \
                       -serial mon:stdio"
         fi
 
